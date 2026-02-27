@@ -8,11 +8,11 @@ router.post('/addtocart', async (req, res) => {
   try {
     const { userId, productId, image, title, price, quantityType } = req.body;
 
-    // Validate if userId is provided
-    if (!userId) {
+    // Validate if userId and productId are provided
+    if (!userId || !productId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID is required'
+        message: 'Authentication required: User ID and Product ID are required'
       });
     }
 
@@ -20,7 +20,7 @@ router.post('/addtocart', async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid user ID format'
+        message: 'Invalid authentication: Invalid user ID format'
       });
     }
 
@@ -28,9 +28,9 @@ router.post('/addtocart', async (req, res) => {
     const user = await USER.findById(userId);
     
     if (!user) {
-      return res.status(404).json({
+      return res.status(401).json({
         success: false,
-        message: 'User not found'
+        message: 'Authentication required: User not found. Please login again.'
       });
     }
 
@@ -321,10 +321,10 @@ router.post('/addtowishlist', async (req, res) => {
     const { userId, productId, image, title, price } = req.body;
 
     // Validate if userId is provided
-    if (!userId) {
+    if (!userId || !productId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID is required'
+        message: 'Authentication required: User ID and Product ID are required'
       });
     }
 
@@ -332,7 +332,7 @@ router.post('/addtowishlist', async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid user ID format'
+        message: 'Invalid authentication: Invalid user ID format'
       });
     }
 
@@ -340,9 +340,9 @@ router.post('/addtowishlist', async (req, res) => {
     const user = await USER.findById(userId);
     
     if (!user) {
-      return res.status(404).json({
+      return res.status(401).json({
         success: false,
-        message: 'User not found'
+        message: 'Authentication required: User not found. Please login again.'
       });
     }
 

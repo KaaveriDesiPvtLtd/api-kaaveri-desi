@@ -15,10 +15,6 @@ require('./model/Order')
 require('./model/Review')
 require('./model/Testimonial')
 require('./model/Product')
-require('./model/CrmProduct')
-require('./model/CrmOrder')
-require('./model/StockTransaction')
-require('./model/Customer')
 require('./model/Settings')
 
 
@@ -31,6 +27,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(require('./middleware/security'));
+app.use('/otp', require('./routes/otpRoutes'));
 app.use(require('./routes/auth'))
 app.use(require('./routes/features'))
 app.use(require('./routes/order'))
@@ -38,6 +35,7 @@ app.use(require('./routes/admin'))
 app.use(require('./routes/reviews'))
 app.use(require('./routes/testimonials'))
 app.use(require('./routes/products'))
+app.use('/api/crm/auth', require('./routes/crmAuthRoutes'))
 app.use('/api/crm', require('./routes/crmRoutes'))
 
 // 404 Handler
@@ -48,7 +46,11 @@ app.use((req, res) => {
 // Global Error Handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
-    res.status(500).json({ error: "Something went wrong on the server" });
+    res.status(500).json({ 
+        error: "Internal Server Error",
+        message: err.message,
+        path: req.path
+    });
 });
 
 app.listen(port , () => {
@@ -62,6 +64,33 @@ mongoose.connect(mongoURl, {
     serverSelectionTimeoutMS: 5000 // 5 second timeout
 }).then(async () => {
     console.log("Mongoose is connected");
+
+    // Seed super admin user in admin DB
+    try {
+        const adminDb = mongoose.connection.useDb('crm_admin');
+        if (!adminDb.models.AdminUser) {
+            const adminUserSchema = require('./model/AdminUser');
+            adminDb.model('AdminUser', adminUserSchema);
+        }
+        const AdminUser = adminDb.models.AdminUser;
+        const superAdminExists = await AdminUser.findOne({ username: 'desisuperadmin' });
+        if (!superAdminExists) {
+            const superAdmin = new AdminUser({
+                username: 'desisuperadmin',
+                password: 'Desi@2026',
+                name: 'Super Admin',
+                role: 'superadmin',
+                isActive: true
+            });
+            await superAdmin.save();
+            console.log('Super admin user seeded successfully.');
+        } else {
+            console.log('Super admin user already exists.');
+        }
+    } catch (err) {
+        console.error('Error seeding super admin:', err.message);
+    }
+
     // Seed testimonials if needed
     const Testimonial = mongoose.model("Testimonial");
     const count = await Testimonial.countDocuments();
@@ -133,14 +162,16 @@ mongoose.connect(mongoURl, {
             image: '/Products/milk.jpg',
             image2: '/Products/milk.jpg',
             videoUrl: '/Vdos/milk.mp4',
+            baseVariant: { label: '500 ml', quantity: 500, unit: 'ml', price: 499 },
             basePrice: '499',
             benefits: ['100% Pure', 'Rich in Calcium', 'Farm Fresh', 'No Preservatives'],
             color: 'from-blue-500 to-cyan-500',
             category: 'Dairy',
+            quantity: 500,
+            unit: 'ml',
             variants: [
-              { label: '500 ml', value: 50, priceIncrement: 0 },
-              { label: '1 Liter', value: 100, priceIncrement: 300 },
-              { label: '2 Liter', value: 200, priceIncrement: 500 }
+              { label: '1 Liter', value: 1000, unit: 'ml', priceIncrement: 300 },
+              { label: '2 Liter', value: 2000, unit: 'ml', priceIncrement: 500 }
             ]
           },
           {
@@ -152,14 +183,16 @@ mongoose.connect(mongoURl, {
             image: '/Products/ghee.jpg',
             image2: '/Products/ghee.jpg',
             videoUrl: '/Vdos/ghee.mp4',
+            baseVariant: { label: '500 ml', quantity: 500, unit: 'ml', price: 190 },
             basePrice: '190',
             benefits: ['Traditional Recipe', 'Rich Aroma', 'Health Benefits', 'Handcrafted'],
             color: 'from-amber-500 to-yellow-500',
             category: 'Dairy',
+            quantity: 500,
+            unit: 'ml',
             variants: [
-              { label: '500 ml', value: 50, priceIncrement: 0 },
-              { label: '1 Liter', value: 100, priceIncrement: 300 },
-              { label: '2 Liter', value: 200, priceIncrement: 500 }
+              { label: '1 Liter', value: 1000, unit: 'ml', priceIncrement: 300 },
+              { label: '2 Liter', value: 2000, unit: 'ml', priceIncrement: 500 }
             ]
           },
           {
@@ -171,14 +204,16 @@ mongoose.connect(mongoURl, {
             image: '/Products/jagry.jpg',
             image2: '/Products/jagry.jpg',
             videoUrl: '/Vdos/jagrery.mp4',
+            baseVariant: { label: '500 gm', quantity: 500, unit: 'gm', price: 699 },
             basePrice: '699',
             benefits: ['100% Organic', 'Rich in Iron', 'Natural', 'Unrefined'],
             color: 'from-orange-500 to-red-500',
             category: 'Groceries',
+            quantity: 500,
+            unit: 'gm',
             variants: [
-              { label: '500 gm', value: 50, priceIncrement: 0 },
-              { label: '1 Kg', value: 100, priceIncrement: 300 },
-              { label: '2 Kg', value: 200, priceIncrement: 500 }
+              { label: '1 Kg', value: 1, unit: 'kg', priceIncrement: 300 },
+              { label: '2 Kg', value: 2, unit: 'kg', priceIncrement: 500 }
             ]
           }
         ];

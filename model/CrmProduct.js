@@ -63,8 +63,7 @@ const crmProductSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Index for SKU and search
-crmProductSchema.index({ sku: 1 });
+// Index for search
 crmProductSchema.index({ name: 'text', category: 'text' });
 
 module.exports = mongoose.model('CrmProduct', crmProductSchema);

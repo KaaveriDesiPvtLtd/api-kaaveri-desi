@@ -1,8 +1,11 @@
 const { encrypt, decrypt } = require('../utils/crypto-utils');
 
 const securityMiddleware = (req, res, next) => {
-    // Exempt /allproducts from encryption/decryption for now to avoid large payload issues
-    if (req.path === '/allproducts' || req.path === '/api/testimonials') {
+    // Exempt certain routes from encryption/decryption
+    if (req.path === '/allproducts' || 
+        req.path.startsWith('/product/') ||
+        req.path === '/api/testimonials' || 
+        req.path.startsWith('/api/crm')) {
         return next();
     }
 

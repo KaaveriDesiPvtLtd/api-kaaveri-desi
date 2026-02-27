@@ -13,6 +13,26 @@ const razorpayInstance = new Razorpay({
 });
 
 const USER = mongoose.model('USER');
+const Product = require('../model/Product');
+
+// Unit conversion helper: converts an amount from one unit to another
+// Returns the amount in the target (product base) unit
+function convertToBaseUnit(amount, fromUnit, toUnit) {
+  if (!fromUnit || !toUnit) return amount;
+  const from = fromUnit.toLowerCase().trim();
+  const to = toUnit.toLowerCase().trim();
+  if (from === to) return amount;
+
+  // Volume conversions
+  if (from === 'ltr' && to === 'ml') return amount * 1000;
+  if (from === 'ml' && to === 'ltr') return amount / 1000;
+  // Weight conversions
+  if (from === 'kg' && to === 'gm') return amount * 1000;
+  if (from === 'gm' && to === 'kg') return amount / 1000;
+
+  // If units are incompatible or unknown, return as-is
+  return amount;
+}
 
 // 1. CREATE ORDER ROUTE
 router.post('/createorder', async (req, res) => {
@@ -168,6 +188,47 @@ router.post('/verifypayment', async (req, res) => {
     // Save user
     await user.save();
 
+    // Atomically decrement stock for each product in the order (unit-aware)
+    const validItems = cartItems.filter(item => item.productId);
+    if (validItems.length > 0) {
+      // Batch-fetch products to get base unit and variants
+      const productIds = [...new Set(validItems.map(i => i.productId))];
+      const products = await Product.find({ productId: { $in: productIds } }).lean();
+      const productMap = {};
+      products.forEach(p => { productMap[p.productId] = p; });
+
+      const stockOps = validItems.map(item => {
+        const product = productMap[item.productId];
+        const purchaseQty = Number(item.quantity) || 1;
+        let decrementAmount = purchaseQty; // fallback
+
+        if (product) {
+          const baseUnit = product.baseVariant?.unit || product.unit || '';
+          // Find the matching variant to get its unit
+          const qType = Number(item.quantityType);
+          let variantUnit = baseUnit; // default to base unit
+          // Check baseVariant first
+          if (product.baseVariant && Number(product.baseVariant.quantity) === qType) {
+            variantUnit = product.baseVariant.unit || baseUnit;
+          } else if (product.variants && product.variants.length > 0) {
+            const matched = product.variants.find(v => Number(v.value) === qType);
+            if (matched) variantUnit = matched.unit || baseUnit;
+          }
+          // Convert quantityType (the variant amount) to the product's base unit
+          const convertedAmount = convertToBaseUnit(qType || 0, variantUnit, baseUnit);
+          decrementAmount = convertedAmount * purchaseQty;
+        }
+
+        return {
+          updateOne: {
+            filter: { productId: item.productId },
+            update: { $inc: { currentStock: -decrementAmount } }
+          }
+        };
+      });
+      await Product.bulkWrite(stockOps);
+    }
+
     res.status(200).json({
       success: true,
       message: 'Payment verified and order placed successfully',
@@ -273,6 +334,43 @@ router.post('/placeorder', async (req, res) => {
 
     // Save user
     await user.save();
+
+    // Atomically decrement stock for each product in the order (unit-aware)
+    const validItems = orderItems.filter(item => item.productId);
+    if (validItems.length > 0) {
+      const productIds = [...new Set(validItems.map(i => i.productId))];
+      const products = await Product.find({ productId: { $in: productIds } }).lean();
+      const productMap = {};
+      products.forEach(p => { productMap[p.productId] = p; });
+
+      const stockOps = validItems.map(item => {
+        const product = productMap[item.productId];
+        const purchaseQty = Number(item.quantity) || 1;
+        let decrementAmount = purchaseQty;
+
+        if (product) {
+          const baseUnit = product.baseVariant?.unit || product.unit || '';
+          const qType = Number(item.quantityType);
+          let variantUnit = baseUnit;
+          if (product.baseVariant && Number(product.baseVariant.quantity) === qType) {
+            variantUnit = product.baseVariant.unit || baseUnit;
+          } else if (product.variants && product.variants.length > 0) {
+            const matched = product.variants.find(v => Number(v.value) === qType);
+            if (matched) variantUnit = matched.unit || baseUnit;
+          }
+          const convertedAmount = convertToBaseUnit(qType || 0, variantUnit, baseUnit);
+          decrementAmount = convertedAmount * purchaseQty;
+        }
+
+        return {
+          updateOne: {
+            filter: { productId: item.productId },
+            update: { $inc: { currentStock: -decrementAmount } }
+          }
+        };
+      });
+      await Product.bulkWrite(stockOps);
+    }
 
     res.status(200).json({
       success: true,

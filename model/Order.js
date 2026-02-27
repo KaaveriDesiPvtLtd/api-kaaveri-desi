@@ -55,17 +55,44 @@ const orderSchema = new mongoose.Schema({
     },
     orderStatus: {
         type: String,
-        enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
-        default: 'pending'
+        enum: ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
+        default: 'Pending'
+    },
+    channel: {
+        type: String,
+        default: 'Website',
+        enum: ['Website', 'WhatsApp', 'In-Person', 'Amazon', 'Blinkit', 'Flipkart', 'Swiggy Instamart']
+    },
+    revenue: {
+        type: Number,
+        default: 0
+    },
+    shippingCost: {
+        type: Number,
+        default: 0
+    },
+    platformCommission: {
+        type: Number,
+        default: 0
+    },
+    netProfit: {
+        type: Number,
+        default: 0
+    },
+    customer: {
+        name: String,
+        phone: String,
+        email: String,
+        address: String
     },
     paymentMethod: {
         type: String,
-        enum: ['cod', 'razorpay', 'online', 'card', 'upi', 'netbanking'],
+        enum: ['cod', 'razorpay', 'online', 'card', 'upi', 'netbanking', 'Cash', 'Online'],
         required: true
     },
     paymentStatus: {
         type: String,
-        enum: ['pending', 'paid', 'completed', 'failed', 'refunded'],
+        enum: ['pending', 'paid', 'completed', 'failed', 'refunded', 'Pending', 'Paid'],
         default: 'pending'
     },
     paymentDetails: {
@@ -84,32 +111,26 @@ const orderSchema = new mongoose.Schema({
     },
     shippingAddress: {
         fullName: {
-            type: String,
-            required: true
+            type: String
         },
         phone: {
-            type: String,
-            required: true
+            type: String
         },
         addressLine1: {
-            type: String,
-            required: true
+            type: String
         },
         addressLine2: {
             type: String,
             default: ''
         },
         city: {
-            type: String,
-            required: true
+            type: String
         },
         state: {
-            type: String,
-            required: true
+            type: String
         },
         pincode: {
-            type: String,
-            required: true
+            type: String
         },
         country: {
             type: String,
@@ -139,6 +160,8 @@ const orderSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+orderSchema.index({ userId: 1, channel: 1, orderStatus: 1 });
 
 // Add index for faster queries on userId
 orderSchema.index({ userId: 1 });

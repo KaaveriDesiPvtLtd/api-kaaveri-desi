@@ -14,16 +14,31 @@ const Jwt_secret = process.env.JWT_SECRET;
 
 
 
+const OTP_JWT_SECRET = process.env.OTP_JWT_SECRET || 'otp-fallback-secret';
+
 router.post("/signup" , (req,res)=> {
-    const {name , userName , password ,email} = req.body;
-    // const ip = req.headers['cf-connecting-ip'] ||
-    //             req.headers['x-real-ip'] ||
-    //             req.headers['x-forwarded-for'] ||
-    //             req.socket.remoteAddress || '' ;
+    const {name , userName , password , email, phone, otpVerificationToken} = req.body;
 
     console.log("req.body ", req.body)
-    if(!name ||!userName ||!password ||!email){
+    if(!name ||!userName ||!password ||!email || !phone){
         return res.status(422).json({error : "Please add all the fields"})
+    }
+
+    // Verify OTP verification token
+    if (!otpVerificationToken) {
+        return res.status(403).json({ error: "OTP verification is required before signup." });
+    }
+
+    try {
+        const decoded = jwt.verify(otpVerificationToken, OTP_JWT_SECRET);
+        if (!decoded.verified || decoded.email !== email.toLowerCase()) {
+            return res.status(403).json({ error: "Invalid OTP verification. Please verify your email again." });
+        }
+    } catch (err) {
+        if (err.name === 'TokenExpiredError') {
+            return res.status(403).json({ error: "OTP verification has expired. Please verify again." });
+        }
+        return res.status(403).json({ error: "Invalid OTP verification token." });
     }
 
     TEACHER.findOne({$or : [{email : email} , {userName: userName}]}).then((savedUser) => {
@@ -39,10 +54,10 @@ router.post("/signup" , (req,res)=> {
             const teacher = new TEACHER ({
                 name , 
                 userName , 
-                email,    
+                email,
+                phone,
                 password:hashedPassword, //hiding password,
                 userid: userid
-                // ip
             })
         
             teacher.save()

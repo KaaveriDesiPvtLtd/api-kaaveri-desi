@@ -66,7 +66,6 @@ const crmOrderSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-crmOrderSchema.index({ orderId: 1 });
 crmOrderSchema.index({ channel: 1 });
 crmOrderSchema.index({ status: 1 });
 

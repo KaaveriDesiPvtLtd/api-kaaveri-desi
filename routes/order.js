@@ -5,6 +5,22 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const USER = mongoose.model("USER");
 const ORDER = mongoose.model("ORDER");
+const Product = require('../model/Product');
+
+// Unit conversion helper: converts an amount from one unit to another
+function convertToBaseUnit(amount, fromUnit, toUnit) {
+  if (!fromUnit || !toUnit) return amount;
+  const from = fromUnit.toLowerCase().trim();
+  const to = toUnit.toLowerCase().trim();
+  if (from === to) return amount;
+  // Volume conversions
+  if (from === 'ltr' && to === 'ml') return amount * 1000;
+  if (from === 'ml' && to === 'ltr') return amount / 1000;
+  // Weight conversions
+  if (from === 'kg' && to === 'gm') return amount * 1000;
+  if (from === 'gm' && to === 'kg') return amount / 1000;
+  return amount;
+}
 
 router.post('/placeorder', async (req, res) => {
   try {
@@ -97,6 +113,73 @@ router.post('/placeorder', async (req, res) => {
     await newOrder.save();
 
     console.log('✅ Order saved successfully to ORDER collection for user:', user.email);
+
+    // Atomically decrement stock for each product in the order (unit-aware)
+    const validItems = orderItems.filter(item => item.productId);
+    if (validItems.length > 0) {
+      // Look up products by BOTH productId and id fields, since the cart may store either
+      const itemProductIds = [...new Set(validItems.map(i => i.productId))];
+      const products = await Product.find({
+        $or: [
+          { productId: { $in: itemProductIds } },
+          { id: { $in: itemProductIds } }
+        ]
+      }).lean();
+
+      // Build lookup map keyed by both productId and id
+      const productMap = {};
+      products.forEach(p => {
+        if (p.productId) productMap[p.productId] = p;
+        if (p.id) productMap[p.id] = p;
+      });
+
+      const stockOps = validItems.map(item => {
+        const product = productMap[item.productId];
+        const purchaseQty = Number(item.quantity) || 1;
+        let decrementAmount = purchaseQty; // fallback: just the count
+
+        if (product) {
+          // The base unit that currentStock is tracked in
+          const baseUnit = (product.baseVariant?.unit || product.unit || '').toLowerCase().trim();
+          const qType = Number(item.quantityType);
+
+          // Find the unit of the purchased variant
+          let variantUnit = baseUnit;
+          if (!isNaN(qType) && qType > 0) {
+            // Check if it matches the baseVariant
+            if (product.baseVariant && Number(product.baseVariant.quantity) === qType) {
+              variantUnit = (product.baseVariant.unit || baseUnit).toLowerCase().trim();
+            } else if (product.variants && product.variants.length > 0) {
+              const matched = product.variants.find(v => Number(v.value) === qType);
+              if (matched) {
+                variantUnit = (matched.unit || baseUnit).toLowerCase().trim();
+              }
+            }
+            // Convert the variant amount to the base unit
+            const convertedAmount = convertToBaseUnit(qType, variantUnit, baseUnit);
+            decrementAmount = convertedAmount * purchaseQty;
+          }
+
+          console.log(`📦 Stock decrement: product=${product.name}, baseUnit=${baseUnit}, qType=${qType}, variantUnit=${variantUnit}, convertedAmount=${convertToBaseUnit(qType || 0, variantUnit, baseUnit)}, purchaseQty=${purchaseQty}, finalDecrement=${decrementAmount}`);
+        } else {
+          console.warn(`⚠️ Product not found for productId: ${item.productId}, falling back to decrement by ${purchaseQty}`);
+        }
+
+        // Use _id for reliable filter since we looked up the product
+        const filter = product
+          ? { _id: product._id }
+          : { $or: [{ productId: item.productId }, { id: item.productId }] };
+
+        return {
+          updateOne: {
+            filter,
+            update: { $inc: { currentStock: -decrementAmount } }
+          }
+        };
+      });
+      await Product.bulkWrite(stockOps);
+      console.log('✅ Stock decremented for', stockOps.length, 'products');
+    }
 
     res.status(200).json({
       success: true,
