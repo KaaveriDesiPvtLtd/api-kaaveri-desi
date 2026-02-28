@@ -5,6 +5,8 @@ const { authenticateCRM, authorize, getPermissionsForRole } = require('../middle
 
 const CRM_JWT_SECRET = process.env.CRM_JWT_SECRET || 'crm-fallback-secret-key';
 
+// CRM Auth routes
+
 // Helper to get AdminUser model (registered on adminDb connection)
 const getAdminUser = () => {
   const mongoose = require('mongoose');
