@@ -11,10 +11,14 @@ const securityMiddleware = (req, res, next) => {
 
     // 1. Decrypt Request Body
     if (req.body && req.body.encryptedData) {
+        console.log(`[SECURITY] Attempting decryption...`);
         try {
             const decryptedString = decrypt(req.body.encryptedData);
             if (decryptedString) {
+                console.log(`[SECURITY] Decryption successful.`);
                 req.body = JSON.parse(decryptedString);
+            } else {
+                console.log(`[SECURITY] Decryption returned null.`);
             }
         } catch (error) {
             console.error('Security Middleware: Decryption failed for request', error.message);

@@ -20,7 +20,7 @@ require('./model/Settings')
 
 // Middleware for request logging
 app.use((req, res, next) => {
-    console.log(`${req.method} ${req.path}`);
+    console.log(`[DEBUG] ${req.method} ${req.path}`);
     next();
 });
 
@@ -48,7 +48,7 @@ app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ 
         error: "Internal Server Error",
-        message: err.message,
+        message: "An unexpected internal server error occurred.",
         path: req.path
     });
 });
