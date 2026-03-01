@@ -1,11 +1,17 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const connectDB = require("../lib/db");
 const router = express.Router()
 
-const USER = mongoose.model("USER");
+const getModels = async () => {
+    await connectDB();
+    const USER = mongoose.model("USER");
+    return { USER };
+};
 
 router.post('/addtocart', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId, productId, image, title, price, quantityType } = req.body;
 
     // Validate if userId and productId are provided
@@ -97,6 +103,7 @@ router.post('/addtocart', async (req, res) => {
 
 router.get('/getcart/:userId', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId } = req.params;
 
     // Validate if userId is a valid MongoDB ObjectId
@@ -144,6 +151,7 @@ router.get('/getcart/:userId', async (req, res) => {
 // Update Cart Item Quantity
 router.post('/updatecartquantity', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId, productId, quantity } = req.body;
 
     // Validate inputs
@@ -236,6 +244,7 @@ router.post('/updatecartquantity', async (req, res) => {
 // Remove Item from Cart
 router.post('/removefromcart', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId, productId } = req.body;
 
     if (!userId || !productId) {
@@ -318,6 +327,7 @@ router.post('/removefromcart', async (req, res) => {
 // Add to Wishlist
 router.post('/addtowishlist', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId, productId, image, title, price } = req.body;
 
     // Validate if userId is provided
@@ -394,6 +404,7 @@ router.post('/addtowishlist', async (req, res) => {
 // Remove from Wishlist
 router.post('/removefromwishlist', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId, productId } = req.body;
 
     // Validate if userId is provided
@@ -447,6 +458,7 @@ router.post('/removefromwishlist', async (req, res) => {
 // Get Wishlist
 router.get('/getwishlist/:userId', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId } = req.params;
 
     // Validate if userId is a valid MongoDB ObjectId

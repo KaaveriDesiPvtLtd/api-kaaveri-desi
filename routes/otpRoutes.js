@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const connectDB = require('../lib/db');
 const router = express.Router();
 
 const OTP_JWT_SECRET = process.env.OTP_JWT_SECRET || 'otp-fallback-secret';
@@ -118,6 +119,7 @@ const sendSmsOTP = async (phone, otp) => {
 // ═════════════════════════════════════════════════════════════════════════════
 router.post('/send', async (req, res) => {
   try {
+    await connectDB();
     const { email, phone, channel = 'email' } = req.body;
 
     if (!email) {
@@ -180,6 +182,7 @@ router.post('/send', async (req, res) => {
 // ═════════════════════════════════════════════════════════════════════════════
 router.post('/verify', async (req, res) => {
   try {
+    await connectDB();
     const { email, otp } = req.body;
 
     if (!email || !otp) {

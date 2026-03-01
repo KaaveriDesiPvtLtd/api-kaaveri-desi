@@ -7,7 +7,18 @@ const { authenticateCRM, authorize } = require('../middleware/crmAuth');
 
 const dashboardController = require('../controllers/dashboardController');
 
+const connectDB = require('../lib/db');
+
 // All CRM routes require authentication
+router.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.use(authenticateCRM);
 
 // Dashboard

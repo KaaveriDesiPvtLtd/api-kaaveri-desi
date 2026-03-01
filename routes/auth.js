@@ -1,5 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const connectDB = require("../lib/db");
 const router = express.Router()
 
 const bcryptjs = require('bcryptjs');
@@ -18,6 +19,7 @@ const OTP_JWT_SECRET = process.env.OTP_JWT_SECRET || 'otp-fallback-secret';
 
 router.post("/signup" , async (req,res, next)=> {
     try {
+        await connectDB();
         const {name , userName , password , email, phone, otpVerificationToken} = req.body;
 
         console.log("[DEBUG] Signup Request body keys:", Object.keys(req.body));
@@ -73,6 +75,7 @@ router.post("/signup" , async (req,res, next)=> {
 
 router.post("/signin" , async (req , res, next) => {
     try {
+        await connectDB();
         const {email , password} = req.body;
 
         if(!email || !password){

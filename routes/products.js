@@ -1,11 +1,17 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
-const Product = mongoose.model("Product");
+const connectDB = require('../lib/db');
+
+const getProductModel = async () => {
+    await connectDB();
+    return mongoose.model("Product");
+};
 
 // Get all products
 router.get('/allproducts', async (req, res) => {
   try {
+    const Product = await getProductModel();
     const products = await Product.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 });
     
     // JIT Migration: Assign productId, quantity, and unit if missing
@@ -57,6 +63,7 @@ router.get('/allproducts', async (req, res) => {
 // Add a product (for seeding/admin)
 router.post('/addproduct', async (req, res) => {
   try {
+    const Product = await getProductModel();
     const productData = req.body;
     
     // Check if product with same id already exists
@@ -89,6 +96,7 @@ router.post('/addproduct', async (req, res) => {
 // Get product by ID or productId
 router.get('/product/:productId', async (req, res) => {
   try {
+    const Product = await getProductModel();
     const { productId } = req.params;
     // Search by both website id and CRM productId
     let product = await Product.findOne({ 

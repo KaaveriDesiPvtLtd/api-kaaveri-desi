@@ -1,11 +1,17 @@
 const express = require('express');
-const router = express.Router();
 const mongoose = require('mongoose');
-const Testimonial = mongoose.model("Testimonial");
+const router = express.Router();
+const connectDB = require('../lib/db');
+
+const getTestimonialModel = async () => {
+    await connectDB();
+    return mongoose.model("Testimonial");
+};
 
 // Get all testimonials
 router.get('/api/testimonials', async (req, res) => {
   try {
+    const Testimonial = await getTestimonialModel();
     const testimonials = await Testimonial.find().sort({ createdAt: -1 });
     
     // JIT Migration: Fix local image paths on the fly if they exist

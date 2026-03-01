@@ -3,9 +3,16 @@ const router = express.Router();
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
-const USER = mongoose.model("USER");
-const ORDER = mongoose.model("ORDER");
-const Product = require('../model/Product');
+const connectDB = require('../lib/db');
+
+const getModels = async () => {
+    await connectDB();
+    return {
+        USER: mongoose.model("USER"),
+        ORDER: mongoose.model("ORDER"),
+        Product: require('../model/Product')
+    };
+};
 
 // Unit conversion helper: converts an amount from one unit to another
 function convertToBaseUnit(amount, fromUnit, toUnit) {
@@ -24,6 +31,7 @@ function convertToBaseUnit(amount, fromUnit, toUnit) {
 
 router.post('/placeorder', async (req, res) => {
   try {
+    const { USER, ORDER, Product } = await getModels();
     const {
       userId, // This is expected to be the _id from the frontend
       orderId,
@@ -226,6 +234,7 @@ router.post('/placeorder', async (req, res) => {
 
 router.post('/clearcart/:userId', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId } = req.params;
 
     const user = await USER.findById(userId);
@@ -253,6 +262,7 @@ router.post('/clearcart/:userId', async (req, res) => {
 
 router.get('/getorder/:userId/:orderId', async (req, res) => {
   try {
+    const { USER, ORDER } = await getModels();
     const { userId, orderId } = req.params;
 
     // Use lean() to see fields not in current schema
@@ -291,6 +301,7 @@ router.get('/getorder/:userId/:orderId', async (req, res) => {
 
 router.get('/getorders/:userId', async (req, res) => {
   try {
+    const { USER, ORDER } = await getModels();
     const { userId } = req.params;
 
     // Use lean() to see legacy fields
@@ -342,6 +353,7 @@ router.get('/getorders/:userId', async (req, res) => {
 // GET /checkcart - Check if product is in user's cart
 router.get('/checkcart', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId, productId, quantityType } = req.query;
     
     if (!userId || !productId) {
@@ -373,6 +385,7 @@ router.get('/checkcart', async (req, res) => {
 // GET /checkwishlist - Check if product is in user's wishlist
 router.get('/checkwishlist', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId, productId } = req.query;
     
     if (!userId || !productId) {
@@ -402,6 +415,7 @@ router.get('/checkwishlist', async (req, res) => {
 // 1. Check if first order
 router.get('/check-first-order/:userId', async (req, res) => {
   try {
+    const { USER, ORDER } = await getModels();
     const user = await USER.findById(req.params.userId);
     if (!user) {
       return res.json({ success: false, message: 'User not found' });
@@ -418,6 +432,7 @@ router.get('/check-first-order/:userId', async (req, res) => {
 // 2. Apply coupon logic
 router.post('/apply-coupon', async (req, res) => {
   try {
+    const { USER, ORDER } = await getModels();
     const { userId, cartTotal, couponCode } = req.body;
     
     const user = await USER.findById(userId);
@@ -484,6 +499,7 @@ const razorpay = new Razorpay({
 
 router.post('/create-razorpay-order', async (req, res) => {
   try {
+    await connectDB();
     const { amount, currency, receipt } = req.body;
     
     const options = {

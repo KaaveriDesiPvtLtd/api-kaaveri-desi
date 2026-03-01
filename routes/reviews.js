@@ -1,13 +1,17 @@
-// routes/reviews.js
-const express = require("express");
-const mongoose = require("mongoose");
+const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
-// const Review = require('Review');
-const Review = mongoose.model("Review");
+const connectDB = require('../lib/db');
+
+const getReviewModel = async () => {
+    await connectDB();
+    return mongoose.model("Review");
+};
 
 // POST route - Add review for a specific product (productId from URL)
 router.post('/reviews/:productId', async (req, res) => {
     try {
+        const Review = await getReviewModel();
         const { productId } = req.params;  // Get productId from URL
         const { userName, userEmail, rating, comment } = req.body;
         
@@ -88,6 +92,7 @@ router.post('/reviews/:productId', async (req, res) => {
 // routes/reviews.js
 router.get('/reviews/:productId', async (req, res) => {
     try {
+        const Review = await getReviewModel();
         const { productId } = req.params;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 5;

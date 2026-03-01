@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const connectDB = require('../lib/db');
 const router = express.Router();
 const { authenticateCRM, authorize, getPermissionsForRole } = require('../middleware/crmAuth');
 
@@ -8,8 +9,9 @@ const CRM_JWT_SECRET = process.env.CRM_JWT_SECRET || 'crm-fallback-secret-key';
 // CRM Auth routes
 
 // Helper to get AdminUser model (registered on adminDb connection)
-const getAdminUser = () => {
+const getAdminUser = async () => {
   const mongoose = require('mongoose');
+  await connectDB();
   const adminDb = mongoose.connection.useDb('crm_admin');
   if (!adminDb.models.AdminUser) {
     const adminUserSchema = require('../model/AdminUser');
@@ -24,13 +26,14 @@ const getAdminUser = () => {
  */
 router.post('/login', async (req, res) => {
   try {
+    await connectDB();
     const { username, password } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({ success: false, message: 'Username and password are required.' });
     }
 
-    const AdminUser = getAdminUser();
+    const AdminUser = await getAdminUser();
     const user = await AdminUser.findOne({ username: username.toLowerCase().trim() });
 
     if (!user) {
@@ -76,7 +79,8 @@ router.post('/login', async (req, res) => {
  */
 router.get('/me', authenticateCRM, async (req, res) => {
   try {
-    const AdminUser = getAdminUser();
+    await connectDB();
+    const AdminUser = await getAdminUser();
     const user = await AdminUser.findById(req.crmUser.id).select('-password');
 
     if (!user) {
@@ -107,7 +111,8 @@ router.get('/me', authenticateCRM, async (req, res) => {
  */
 router.get('/users', authenticateCRM, authorize('users', 'read'), async (req, res) => {
   try {
-    const AdminUser = getAdminUser();
+    await connectDB();
+    const AdminUser = await getAdminUser();
     const users = await AdminUser.find().select('-password').sort({ createdAt: -1 });
     res.json({ success: true, users });
   } catch (error) {
@@ -122,6 +127,7 @@ router.get('/users', authenticateCRM, authorize('users', 'read'), async (req, re
  */
 router.post('/users', authenticateCRM, authorize('users', 'write'), async (req, res) => {
   try {
+    await connectDB();
     const { username, password, name, role } = req.body;
 
     if (!username || !password || !name || !role) {
@@ -136,7 +142,7 @@ router.post('/users', authenticateCRM, authorize('users', 'write'), async (req, 
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
     }
 
-    const AdminUser = getAdminUser();
+    const AdminUser = await getAdminUser();
     const existing = await AdminUser.findOne({ username: username.toLowerCase().trim() });
     if (existing) {
       return res.status(409).json({ success: false, message: 'Username already exists.' });
@@ -163,7 +169,8 @@ router.post('/users', authenticateCRM, authorize('users', 'write'), async (req, 
  */
 router.put('/users/:id', authenticateCRM, authorize('users', 'write'), async (req, res) => {
   try {
-    const AdminUser = getAdminUser();
+    await connectDB();
+    const AdminUser = await getAdminUser();
     const user = await AdminUser.findById(req.params.id);
 
     if (!user) {
@@ -196,7 +203,8 @@ router.put('/users/:id', authenticateCRM, authorize('users', 'write'), async (re
  */
 router.delete('/users/:id', authenticateCRM, authorize('users', 'write'), async (req, res) => {
   try {
-    const AdminUser = getAdminUser();
+    await connectDB();
+    const AdminUser = await getAdminUser();
     const user = await AdminUser.findById(req.params.id);
 
     if (!user) {

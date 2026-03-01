@@ -3,6 +3,7 @@ const router = express.Router();
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const connectDB = require('../lib/db');
 const User = mongoose.model("USER");
 
 
@@ -10,6 +11,7 @@ const User = mongoose.model("USER");
 // Get all users with pagination
 router.get('/users', async (req, res) => {
     try {
+        await connectDB();
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const search = req.query.search || '';
@@ -45,6 +47,7 @@ router.get('/users', async (req, res) => {
 // Get single user details
 router.get('/users/:id', async (req, res) => {
     try {
+        await connectDB();
         const user = await User.findById(req.params.id).select('-password');
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -58,6 +61,7 @@ router.get('/users/:id', async (req, res) => {
 // Delete user
 router.delete('/users/:id', async (req, res) => {
     try {
+        await connectDB();
         const user = await User.findByIdAndDelete(req.params.id);
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -71,6 +75,7 @@ router.delete('/users/:id', async (req, res) => {
 // Get all orders with pagination and filters
 router.get('/orders', async (req, res) => {
     try {
+        await connectDB();
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const status = req.query.status;
@@ -127,6 +132,7 @@ router.get('/orders', async (req, res) => {
 // Update order status
 router.patch('/orders/:userId/:orderId', async (req, res) => {
     try {
+        await connectDB();
         const { userId, orderId } = req.params;
         const { orderStatus, trackingId, paymentStatus } = req.body;
 
@@ -162,6 +168,7 @@ router.patch('/orders/:userId/:orderId', async (req, res) => {
 // Get dashboard statistics
 router.get('/stats', async (req, res) => {
     try {
+        await connectDB();
         const totalUsers = await User.countDocuments();
         
         const orderStats = await User.aggregate([
@@ -206,6 +213,7 @@ router.get('/stats', async (req, res) => {
 // Get recent orders
 router.get('/orders/recent', async (req, res) => {
     try {
+        await connectDB();
         const limit = parseInt(req.query.limit) || 5;
 
         const recentOrders = await User.aggregate([

@@ -12,15 +12,23 @@ const razorpayInstance = new Razorpay({
   key_secret: Razorpay_key_secret,
 });
 
-const USER = mongoose.model('USER');
-const Product = require('../model/Product');
-
 const { convertToBaseUnit } = require('../utils/unitConversion');
 const { sellStock } = require('../services/stockService');
+
+const connectDB = require('../lib/db');
+
+const getModels = async () => {
+    await connectDB();
+    return {
+        USER: mongoose.model('USER'),
+        Product: require('../model/Product')
+    };
+};
 
 // Verify payment route
 router.post('/createorder', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId, amount, currency, cartItems, shippingDetails } = req.body;
 
     // Validate input
@@ -84,6 +92,7 @@ router.post('/createorder', async (req, res) => {
 // 2. VERIFY PAYMENT ROUTE
 router.post('/verifypayment', async (req, res) => {
   try {
+    const { USER, Product } = await getModels();
     const {
       userId,
       razorpay_order_id,
@@ -237,6 +246,7 @@ router.post('/verifypayment', async (req, res) => {
 // 3. PLACE ORDER ROUTE (for COD)
 router.post('/placeorder', async (req, res) => {
   try {
+    const { USER, Product } = await getModels();
     const {
       userId,
       orderItems,
@@ -385,6 +395,7 @@ router.post('/placeorder', async (req, res) => {
 // BONUS: Get Order Details by Order ID
 router.get('/getorder/:orderId', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { orderId } = req.params;
     const userId = req.query.userId || req.headers['user-id'];
 
@@ -432,6 +443,7 @@ router.get('/getorder/:orderId', async (req, res) => {
 // BONUS: Get All Orders for a User
 router.get('/getorders/:userId', async (req, res) => {
   try {
+    const { USER } = await getModels();
     const { userId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -471,8 +483,9 @@ router.get('/getorders/:userId', async (req, res) => {
 });
 
 // Use the same instance for consistency
-app.post('/create-razorpay-order', async (req, res) => {
+router.post('/create-razorpay-order', async (req, res) => {
   try {
+    await connectDB();
     const { amount, currency, receipt } = req.body;
     
     const options = {
