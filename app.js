@@ -27,16 +27,20 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(require('./middleware/security'));
+// ── CRM Routes (Priority) ─────────────────────────────────────────────────────
+app.get('/api/crm/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
+app.use('/api/crm/auth', require('./routes/crmAuthRoutes'));
+app.use('/api/crm', require('./routes/crmRoutes'));
+
+// ── Legacy Routes ─────────────────────────────────────────────────────────────
 app.use('/otp', require('./routes/otpRoutes'));
-app.use(require('./routes/auth'))
-app.use(require('./routes/features'))
-app.use(require('./routes/order'))
-app.use(require('./routes/admin'))
-app.use(require('./routes/reviews'))
-app.use(require('./routes/testimonials'))
-app.use(require('./routes/products'))
-app.use('/api/crm/auth', require('./routes/crmAuthRoutes'))
-app.use('/api/crm', require('./routes/crmRoutes'))
+app.use(require('./routes/auth'));
+app.use(require('./routes/features'));
+app.use(require('./routes/order'));
+app.use(require('./routes/admin'));
+app.use(require('./routes/reviews'));
+app.use(require('./routes/testimonials'));
+app.use(require('./routes/products'));
 
 // 404 Handler
 app.use((req, res) => {
