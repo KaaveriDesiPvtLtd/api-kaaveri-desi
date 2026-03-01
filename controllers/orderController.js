@@ -2,6 +2,7 @@ const ORDER = require('../model/Order');
 const Product = require('../model/Product');
 const Settings = require('../model/Settings');
 const { sellStock } = require('../services/stockService');
+const { convertToBaseUnit } = require('../utils/unitConversion');
 
 // Helper to normalize orders for the CRM UI
 const normalizeOrder = (order) => {
@@ -42,7 +43,23 @@ exports.createOrder = async (req, res) => {
       if (!product || product.isDeleted || !product.isActive) {
         throw new Error(`Product ${item.sku || item.productId} not available`);
       }
-      if (product.currentStock < item.quantity) {
+      // Extract correct variant/base unit size from item.quantityType
+      const baseUnit = product.baseVariant?.unit || product.unit || '';
+      const qType = item.quantityType ? Number(item.quantityType) : 1; 
+      let variantUnit = baseUnit;
+      
+      if (product.baseVariant && Number(product.baseVariant.quantity) === qType) {
+        variantUnit = product.baseVariant.unit || baseUnit;
+      } else if (product.variants && product.variants.length > 0) {
+        const matched = product.variants.find(v => Number(v.value) === qType);
+        if (matched) variantUnit = matched.unit || baseUnit;
+      }
+      
+      // Calculate true deduction: (size in base unit) * quantity
+      const convertedAmount = convertToBaseUnit(qType || 0, variantUnit, baseUnit);
+      const decrementAmount = (convertedAmount || 1) * item.quantity;
+
+      if (product.currentStock < decrementAmount) {
         throw new Error(`Insufficient stock for ${product.name}`);
       }
       
@@ -61,11 +78,11 @@ exports.createOrder = async (req, res) => {
       
       // Stock Sync: Deduct stock via batch-aware FIFO service
       try {
-        await sellStock(product._id, item.quantity, null, 'OrderSystem');
+        await sellStock(product._id, decrementAmount, null, 'OrderSystem');
       } catch (stockErr) {
         // Fallback: direct deduction for products without batch data
         console.warn(`sellStock fallback for ${product.name}: ${stockErr.message}`);
-        product.currentStock -= item.quantity;
+        product.currentStock -= decrementAmount;
         await product.save();
       }
     }

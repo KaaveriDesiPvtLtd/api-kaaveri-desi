@@ -15,26 +15,10 @@ const razorpayInstance = new Razorpay({
 const USER = mongoose.model('USER');
 const Product = require('../model/Product');
 
-// Unit conversion helper: converts an amount from one unit to another
-// Returns the amount in the target (product base) unit
-function convertToBaseUnit(amount, fromUnit, toUnit) {
-  if (!fromUnit || !toUnit) return amount;
-  const from = fromUnit.toLowerCase().trim();
-  const to = toUnit.toLowerCase().trim();
-  if (from === to) return amount;
+const { convertToBaseUnit } = require('../utils/unitConversion');
+const { sellStock } = require('../services/stockService');
 
-  // Volume conversions
-  if (from === 'ltr' && to === 'ml') return amount * 1000;
-  if (from === 'ml' && to === 'ltr') return amount / 1000;
-  // Weight conversions
-  if (from === 'kg' && to === 'gm') return amount * 1000;
-  if (from === 'gm' && to === 'kg') return amount / 1000;
-
-  // If units are incompatible or unknown, return as-is
-  return amount;
-}
-
-// 1. CREATE ORDER ROUTE
+// Verify payment route
 router.post('/createorder', async (req, res) => {
   try {
     const { userId, amount, currency, cartItems, shippingDetails } = req.body;
@@ -197,36 +181,40 @@ router.post('/verifypayment', async (req, res) => {
       const productMap = {};
       products.forEach(p => { productMap[p.productId] = p; });
 
-      const stockOps = validItems.map(item => {
+      // Track stock deductions via sellStock FIFO service
+      for (const item of validItems) {
         const product = productMap[item.productId];
         const purchaseQty = Number(item.quantity) || 1;
         let decrementAmount = purchaseQty; // fallback
 
         if (product) {
           const baseUnit = product.baseVariant?.unit || product.unit || '';
-          // Find the matching variant to get its unit
           const qType = Number(item.quantityType);
-          let variantUnit = baseUnit; // default to base unit
-          // Check baseVariant first
+          let variantUnit = baseUnit;
+          
           if (product.baseVariant && Number(product.baseVariant.quantity) === qType) {
             variantUnit = product.baseVariant.unit || baseUnit;
           } else if (product.variants && product.variants.length > 0) {
             const matched = product.variants.find(v => Number(v.value) === qType);
             if (matched) variantUnit = matched.unit || baseUnit;
           }
-          // Convert quantityType (the variant amount) to the product's base unit
           const convertedAmount = convertToBaseUnit(qType || 0, variantUnit, baseUnit);
-          decrementAmount = convertedAmount * purchaseQty;
+          // If qType is 0 or missing, it implies item itself is a unit, but 
+          // usually qType is the Variant size. So decrementAmount is variant size * quantity
+          decrementAmount = (convertedAmount || 1) * purchaseQty;
         }
 
-        return {
-          updateOne: {
-            filter: { productId: item.productId },
-            update: { $inc: { currentStock: -decrementAmount } }
-          }
-        };
-      });
-      await Product.bulkWrite(stockOps);
+        try {
+          await sellStock(item.productId, decrementAmount, orderId, 'CustomerOrder');
+        } catch (stockErr) {
+          console.error(`Error deducting stock for ${item.productId}:`, stockErr.message);
+          // Fallback mechanism if sellStock fails
+          await Product.updateOne(
+            { productId: item.productId },
+            { $inc: { currentStock: -decrementAmount } }
+          );
+        }
+      }
     }
 
     res.status(200).json({
@@ -343,15 +331,17 @@ router.post('/placeorder', async (req, res) => {
       const productMap = {};
       products.forEach(p => { productMap[p.productId] = p; });
 
-      const stockOps = validItems.map(item => {
+      // Track stock deductions via sellStock FIFO service
+      for (const item of validItems) {
         const product = productMap[item.productId];
         const purchaseQty = Number(item.quantity) || 1;
-        let decrementAmount = purchaseQty;
+        let decrementAmount = purchaseQty; // fallback
 
         if (product) {
           const baseUnit = product.baseVariant?.unit || product.unit || '';
           const qType = Number(item.quantityType);
           let variantUnit = baseUnit;
+          
           if (product.baseVariant && Number(product.baseVariant.quantity) === qType) {
             variantUnit = product.baseVariant.unit || baseUnit;
           } else if (product.variants && product.variants.length > 0) {
@@ -359,17 +349,20 @@ router.post('/placeorder', async (req, res) => {
             if (matched) variantUnit = matched.unit || baseUnit;
           }
           const convertedAmount = convertToBaseUnit(qType || 0, variantUnit, baseUnit);
-          decrementAmount = convertedAmount * purchaseQty;
+          decrementAmount = (convertedAmount || 1) * purchaseQty;
         }
 
-        return {
-          updateOne: {
-            filter: { productId: item.productId },
-            update: { $inc: { currentStock: -decrementAmount } }
-          }
-        };
-      });
-      await Product.bulkWrite(stockOps);
+        try {
+          await sellStock(item.productId, decrementAmount, orderId, 'CustomerOrder');
+        } catch (stockErr) {
+          console.error(`Error deducting COD stock for ${item.productId}:`, stockErr.message);
+          // Fallback mechanism if sellStock fails
+          await Product.updateOne(
+            { productId: item.productId },
+            { $inc: { currentStock: -decrementAmount } }
+          );
+        }
+      }
     }
 
     res.status(200).json({

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Product = require('../model/Product');
 const Batch = require('../model/Batch');
 const StockTransaction = require('../model/StockTransaction');
+const { convertToBaseUnit } = require('../utils/unitConversion');
 
 /**
  * Receive stock into inventory.
@@ -19,6 +20,11 @@ async function receiveStock(productId, batchData, quantity, performedBy) {
     if (!batchData.batchCode) throw new Error('batchCode is required');
     if (!quantity || quantity <= 0) throw new Error('quantity must be positive');
 
+    // Unit Conversion
+    const baseUnit = product.baseVariant?.unit || product.unit || '';
+    const receivedUnit = batchData.unit || baseUnit;
+    const computedQuantity = convertToBaseUnit(quantity, receivedUnit, baseUnit);
+
     // Create or update the batch
     let batch = await Batch.findOne({
       productId: product._id,
@@ -27,8 +33,8 @@ async function receiveStock(productId, batchData, quantity, performedBy) {
 
     if (batch) {
       // Batch exists — add to it
-      batch.remainingQuantity += quantity;
-      batch.initialQuantity += quantity;
+      batch.remainingQuantity += computedQuantity;
+      batch.initialQuantity += computedQuantity;
       if (batchData.expiryDate) batch.expiryDate = batchData.expiryDate;
       if (batchData.manufacturedDate) batch.manufacturedDate = batchData.manufacturedDate;
       if (batchData.purchasePricePerUnit !== undefined) batch.purchasePricePerUnit = batchData.purchasePricePerUnit;
@@ -42,20 +48,20 @@ async function receiveStock(productId, batchData, quantity, performedBy) {
         manufacturedDate: batchData.manufacturedDate || null,
         expiryDate: batchData.expiryDate || null,
         purchasePricePerUnit: batchData.purchasePricePerUnit || 0,
-        initialQuantity: quantity,
-        remainingQuantity: quantity,
-        unit: batchData.unit || product.unit || '',
+        initialQuantity: computedQuantity,
+        remainingQuantity: computedQuantity,
+        unit: baseUnit, // Always store batches normalized to base variant unit
         isActive: true
       });
       await batch.save({ session });
     }
 
-    // Create IN transaction
+    // Create IN transaction (normalize stored quantity to base unit)
     await new StockTransaction({
       transactionType: 'IN',
       productId: product._id,
       sku: product.sku || product.productId,
-      quantity,
+      quantity: computedQuantity,
       reason: batchData.reason || 'Stock received',
       batchId: batchData.batchCode,
       metadata: { performedBy }

@@ -109,8 +109,7 @@ exports.updateProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    // Strict requirement: Soft delete to keep historical data in CRM
-    const product = await Product.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
+    const product = await Product.findByIdAndDelete(id);
     
     if (!product) return res.status(404).json({ error: 'Product not found' });
     res.json({ message: 'Product deleted successfully' });

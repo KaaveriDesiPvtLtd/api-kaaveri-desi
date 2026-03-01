@@ -6,7 +6,7 @@ const Product = mongoose.model("Product");
 // Get all products
 router.get('/allproducts', async (req, res) => {
   try {
-    const products = await Product.find().sort({ createdAt: -1 });
+    const products = await Product.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 });
     
     // JIT Migration: Assign productId, quantity, and unit if missing
     for (const p of products) {
@@ -92,7 +92,10 @@ router.get('/product/:productId', async (req, res) => {
     const { productId } = req.params;
     // Search by both website id and CRM productId
     let product = await Product.findOne({ 
-      $or: [{ productId: productId }, { id: productId }] 
+      $and: [
+        { $or: [{ productId: productId }, { id: productId }] },
+        { isDeleted: { $ne: true } }
+      ]
     });
     
     if (!product) {
