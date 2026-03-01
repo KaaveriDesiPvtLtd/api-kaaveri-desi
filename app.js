@@ -53,9 +53,13 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.listen(port , () => {
-    console.log(`Server is running on port ${port}`);
-})
+if (require.main === module) {
+    app.listen(port , () => {
+        console.log(`Server is running on port ${port}`);
+    })
+}
+
+module.exports = app;
 
 const mongoose = require('mongoose');
 const mongoURl = process.env.MONGO_URL;
