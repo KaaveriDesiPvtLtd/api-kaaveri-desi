@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "kaaveri-desi-backend",
   "builds": [
     {
       "src": "app.js",
@@ -9,16 +8,11 @@
   ],
   "routes": [
     {
-      "src": "/api/crm/auth/(.*)",
-      "dest": "app.js"
-    },
-    {
-      "src": "/api/crm/(.*)",
-      "dest": "app.js"
-    },
-    {
       "src": "/(.*)",
       "dest": "app.js"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }

@@ -24,31 +24,38 @@ app.use((req, res, next) => {
     next();
 });
 
-// ── CRM Routes (Priority - Bypass Security) ───────────────────────────────────
-app.get('/api/crm/health', (req, res) => res.json({ 
-    status: 'ok', 
-    time: new Date(),
-    message: 'CRM API is bypass-active'
-}));
-app.use('/api/crm/auth', require('./routes/crmAuthRoutes'));
-app.use('/api/crm', require('./routes/crmRoutes'));
-
-// ── Standard Content Parsing ──
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-
-// ── Legacy Security (Encryption) ──
 app.use(require('./middleware/security'));
-
-// ── Legacy Routes ─────────────────────────────────────────────────────────────
 app.use('/otp', require('./routes/otpRoutes'));
-app.use(require('./routes/auth'));
-app.use(require('./routes/features'));
-app.use(require('./routes/order'));
-app.use(require('./routes/admin'));
-app.use(require('./routes/reviews'));
-app.use(require('./routes/testimonials'));
-app.use(require('./routes/products'));
+app.use(require('./routes/auth'))
+app.use(require('./routes/features'))
+app.use(require('./routes/order'))
+app.use(require('./routes/admin'))
+app.use(require('./routes/reviews'))
+app.use(require('./routes/testimonials'))
+app.use(require('./routes/products'))
+app.use('/api/crm/auth', require('./routes/crmAuthRoutes'))
+app.use('/api/crm', require('./routes/crmRoutes'))
+
+// Debug endpoint to list all registered routes
+app.get('/api/debug/routes', (req, res) => {
+    const routes = [];
+    app._router.stack.forEach((middleware) => {
+        if (middleware.route) { // routes registered directly on the app
+            routes.push(`${Object.keys(middleware.route.methods).join(', ').toUpperCase()} ${middleware.route.path}`);
+        } else if (middleware.name === 'router') { // router middleware
+            middleware.handle.stack.forEach((handler) => {
+                if (handler.route) {
+                    const path = handler.route.path;
+                    const methods = Object.keys(handler.route.methods).join(', ').toUpperCase();
+                    routes.push(`${methods} ${middleware.regexp.toString().replace('/^', '').replace('(?=\\/|$)/i', '')}${path}`);
+                }
+            });
+        }
+    });
+    res.json({ count: routes.length, routes });
+});
 
 // 404 Handler
 app.use((req, res) => {
