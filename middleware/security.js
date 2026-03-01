@@ -1,11 +1,13 @@
 const { encrypt, decrypt } = require('../utils/crypto-utils');
 
 const securityMiddleware = (req, res, next) => {
+    const fullPath = req.originalUrl || req.path;
+    
     // Exempt certain routes from encryption/decryption
-    if (req.path === '/allproducts' || 
-        req.path.startsWith('/product/') ||
-        req.path === '/api/testimonials' || 
-        req.path.startsWith('/api/crm')) {
+    if (fullPath === '/allproducts' || 
+        fullPath.startsWith('/product/') ||
+        fullPath === '/api/testimonials' || 
+        fullPath.includes('/api/crm')) {
         return next();
     }
 

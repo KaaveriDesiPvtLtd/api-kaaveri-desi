@@ -24,13 +24,21 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use(require('./middleware/security'));
-// ── CRM Routes (Priority) ─────────────────────────────────────────────────────
-app.get('/api/crm/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
+// ── CRM Routes (Priority - Bypass Security) ───────────────────────────────────
+app.get('/api/crm/health', (req, res) => res.json({ 
+    status: 'ok', 
+    time: new Date(),
+    message: 'CRM API is bypass-active'
+}));
 app.use('/api/crm/auth', require('./routes/crmAuthRoutes'));
 app.use('/api/crm', require('./routes/crmRoutes'));
+
+// ── Standard Content Parsing ──
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// ── Legacy Security (Encryption) ──
+app.use(require('./middleware/security'));
 
 // ── Legacy Routes ─────────────────────────────────────────────────────────────
 app.use('/otp', require('./routes/otpRoutes'));
