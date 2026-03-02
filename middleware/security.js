@@ -11,22 +11,20 @@ const securityMiddleware = (req, res, next) => {
 
     // 1. Decrypt Request Body
     if (req.body && req.body.encryptedData) {
-        console.log(`[SECURITY] Attempting decryption...`);
+        console.log(`[SECURITY] Attempting decryption for ${req.method} ${req.path}...`);
         try {
             const decryptedString = decrypt(req.body.encryptedData);
             if (decryptedString) {
                 console.log(`[SECURITY] Decryption successful.`);
                 req.body = JSON.parse(decryptedString);
             } else {
-                console.log(`[SECURITY] Decryption returned null.`);
+                console.log(`[SECURITY] Decryption returned null for payload starting with: ${req.body.encryptedData.substring(0, 20)}...`);
             }
         } catch (error) {
-            console.error('Security Middleware: Decryption failed for request', error.message);
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Invalid encrypted payload' 
-            });
+            console.error('[SECURITY] Error during decryption process:', error.message);
         }
+    } else if (req.body && Object.keys(req.body).length > 0) {
+        console.log(`[SECURITY] Request body present but no encryptedData found. Keys:`, Object.keys(req.body));
     }
 
     // 2. Encrypt Response Body

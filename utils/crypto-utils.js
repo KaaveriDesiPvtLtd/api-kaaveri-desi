@@ -20,12 +20,17 @@ function encrypt(text) {
 function decrypt(text) {
     if (!text) return text;
     try {
+        console.log(`[CRYPTO] Attempting to decrypt payload of length ${text.length}`);
+        if (!ENCRYPTION_KEY || !IV) {
+            console.error('[CRYPTO] Missing encryption key or IV');
+            return null;
+        }
         const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY), Buffer.from(IV));
         let decrypted = decipher.update(Buffer.from(text, 'base64'));
         decrypted = Buffer.concat([decrypted, decipher.final()]);
         return decrypted.toString();
     } catch (error) {
-        console.error('Decryption failed:', error.message);
+        console.error('[CRYPTO] Decryption failed:', error.message);
         return null;
     }
 }
