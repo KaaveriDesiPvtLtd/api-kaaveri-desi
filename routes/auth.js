@@ -20,10 +20,10 @@ const OTP_JWT_SECRET = process.env.OTP_JWT_SECRET || 'otp-fallback-secret';
 router.post("/signup" , async (req,res, next)=> {
     try {
         await connectDB();
-        const {name , userName , password , email, phone, otpVerificationToken} = req.body;
+        const {name , password , email, phone, otpVerificationToken} = req.body;
 
         console.log("[DEBUG] Signup Request body keys:", Object.keys(req.body));
-        if(!name ||!userName ||!password ||!email || !phone){
+        if(!name ||!password ||!email || !phone){
             return res.status(422).json({error : "Please fill all required fields."})
         }
 
@@ -44,9 +44,10 @@ router.post("/signup" , async (req,res, next)=> {
             return res.status(403).json({ error: "Invalid OTP verification token." });
         }
 
-        const savedUser = await TEACHER.findOne({$or : [{email : email} , {userName: userName}]});
+        // Use case-insensitive regex for email lookup
+        const savedUser = await TEACHER.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
         if(savedUser){
-            return res.status(422).json({error : "User already exists with that Email or Username."})
+            return res.status(422).json({error : "User already exists with that Email."})
         }
 
         const hashedPassword = await bcryptjs.hash(password , 12);
@@ -55,7 +56,6 @@ router.post("/signup" , async (req,res, next)=> {
 
         const teacher = new TEACHER ({
             name , 
-            userName , 
             email,
             phone,
             password:hashedPassword, //hiding password,
@@ -83,7 +83,8 @@ router.post("/signin" , async (req , res, next) => {
             return res.status(422).json({error: "Please provide both email and password."})
         }
 
-        const savedUser = await TEACHER.findOne({email: email});
+        // Use case-insensitive regex for email lookup
+        const savedUser = await TEACHER.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
         if(!savedUser){
             console.log(`[DEBUG] Signin Failed: User not found for email:`, email);
             return res.status(422).json({error:"Invalid Email or Password."})
@@ -93,8 +94,8 @@ router.post("/signin" , async (req , res, next) => {
         if(match){
             console.log(`[DEBUG] Signin Success for:`, email);
             const token = jwt.sign({_id:savedUser.id} , Jwt_secret)
-            const {_id ,name , email: userEmail , userName, userid} = savedUser
-            return res.json({token , user:{_id ,name , email: userEmail , userName, userid }})
+            const {_id ,name , email: userEmail, userid} = savedUser
+            return res.json({token , user:{_id ,name , email: userEmail, userid }})
         } else {
             console.log(`[DEBUG] Signin Failed: Password mismatch for:`, email);
             return res.status(422).json({error :"Invalid Email or Password." })
@@ -105,6 +106,50 @@ router.post("/signin" , async (req , res, next) => {
     }
 })
 
+// Forgot Password - Reset Password endpoint
+router.post('/reset-password', async (req, res, next) => {
+    try {
+        await connectDB();
+        const { email, password, otpVerificationToken } = req.body;
+
+        if (!email || !password || !otpVerificationToken) {
+            return res.status(422).json({ error: "Please provide email, new password, and verification token." });
+        }
+
+        // Verify the token
+        try {
+            const decoded = jwt.verify(otpVerificationToken, OTP_JWT_SECRET);
+            if (!decoded.verified || decoded.email !== email.toLowerCase()) {
+                return res.status(403).json({ error: "Invalid verification token. Please verify your OTP again." });
+            }
+        } catch (err) {
+            if (err.name === 'TokenExpiredError') {
+                return res.status(403).json({ error: "Verification token has expired. Please verify OTP again." });
+            }
+            return res.status(403).json({ error: "Invalid verification token." });
+        }
+
+        // Find user by email (case-insensitive)
+        const user = await TEACHER.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        if (!user) {
+            return res.status(404).json({ error: "User not found with this email." });
+        }
+
+        // Hash the new password
+        const hashedPassword = await bcryptjs.hash(password, 12);
+        
+        // Update user's password
+        user.password = hashedPassword;
+        await user.save();
+
+        console.log(`[DEBUG] Password reset successful for:`, email);
+        return res.json({ message: "Password updated successfully. You can now sign in with your new password." });
+
+    } catch (err) {
+        console.error("[ERROR] during password reset:", err);
+        next(err);
+    }
+});
 
 
 

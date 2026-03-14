@@ -34,7 +34,8 @@ router.post('/login', async (req, res) => {
     }
 
     const AdminUser = await getAdminUser();
-    const user = await AdminUser.findOne({ username: username.toLowerCase().trim() });
+    // Use case-insensitive regex for username lookup
+    const user = await AdminUser.findOne({ username: { $regex: new RegExp(`^${username.trim()}$`, 'i') } });
 
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid username or password.' });
@@ -143,7 +144,8 @@ router.post('/users', authenticateCRM, authorize('users', 'write'), async (req, 
     }
 
     const AdminUser = await getAdminUser();
-    const existing = await AdminUser.findOne({ username: username.toLowerCase().trim() });
+    // Use case-insensitive regex for username lookup
+    const existing = await AdminUser.findOne({ username: { $regex: new RegExp(`^${username.trim()}$`, 'i') } });
     if (existing) {
       return res.status(409).json({ success: false, message: 'Username already exists.' });
     }

@@ -4,6 +4,8 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const connectDB = require('../lib/db');
+const { generateInvoicePDF } = require('../utils/pdfGenerator');
+const { sendOrderConfirmationEmail } = require('../utils/emailService');
 
 const getModels = async () => {
     await connectDB();
@@ -188,6 +190,21 @@ router.post('/placeorder', async (req, res) => {
       await Product.bulkWrite(stockOps);
       console.log('✅ Stock decremented for', stockOps.length, 'products');
     }
+
+    // Generate PDF and Send Email asynchronously
+    (async () => {
+      try {
+        const pdfBuffer = await generateInvoicePDF(newOrder);
+        const customerEmail = shippingAddress.email || user.email;
+        if (customerEmail) {
+          await sendOrderConfirmationEmail(customerEmail, orderId, pdfBuffer);
+        } else {
+          console.warn(`⚠️ No email found for order ${orderId}`);
+        }
+      } catch (emailErr) {
+        console.error(`Failed to send email/PDF for order ${orderId}:`, emailErr);
+      }
+    })();
 
     res.status(200).json({
       success: true,

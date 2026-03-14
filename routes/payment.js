@@ -14,6 +14,8 @@ const razorpayInstance = new Razorpay({
 
 const { convertToBaseUnit } = require('../utils/unitConversion');
 const { sellStock } = require('../services/stockService');
+const { generateInvoicePDF } = require('../utils/pdfGenerator');
+const { sendOrderConfirmationEmail } = require('../utils/emailService');
 
 const connectDB = require('../lib/db');
 
@@ -226,6 +228,19 @@ router.post('/verifypayment', async (req, res) => {
       }
     }
 
+    // Generate PDF and Send Email asynchronously (non-blocking)
+    (async () => {
+      try {
+        const pdfBuffer = await generateInvoicePDF(newOrder);
+        const customerEmail = shippingDetails.email || user.email;
+        if (customerEmail) {
+          await sendOrderConfirmationEmail(customerEmail, orderId, pdfBuffer);
+        }
+      } catch (emailErr) {
+        console.error(`Failed to send email/PDF for online order ${orderId}:`, emailErr);
+      }
+    })();
+
     res.status(200).json({
       success: true,
       message: 'Payment verified and order placed successfully',
@@ -374,6 +389,19 @@ router.post('/placeorder', async (req, res) => {
         }
       }
     }
+
+    // Generate PDF and Send Email asynchronously (COD)
+    (async () => {
+      try {
+        const pdfBuffer = await generateInvoicePDF(newOrder);
+        const customerEmail = shippingDetails.email || user.email;
+        if (customerEmail) {
+          await sendOrderConfirmationEmail(customerEmail, orderId, pdfBuffer);
+        }
+      } catch (emailErr) {
+        console.error(`Failed to send email/PDF for COD order ${orderId}:`, emailErr);
+      }
+    })();
 
     res.status(200).json({
       success: true,

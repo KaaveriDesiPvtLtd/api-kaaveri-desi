@@ -130,6 +130,17 @@ router.post('/send', async (req, res) => {
       return res.status(400).json({ error: 'Phone number is required for SMS OTP.' });
     }
 
+    // NEW: Check if user exists before sending OTP for password reset/auth
+    const mongoose = require('mongoose');
+    // Ensure model is registered or explicitly access it
+    const USER = mongoose.models.USER || require('../model/user');
+    // Use case-insensitive regex for email lookup
+    const existingUser = await USER.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+    
+    if (!existingUser) {
+        return res.status(404).json({ error: 'No account found with this email address.' });
+    }
+
     // Rate limit check
     if (!checkRateLimit(email)) {
       return res.status(429).json({ error: 'Too many OTP requests. Please try again later.' });

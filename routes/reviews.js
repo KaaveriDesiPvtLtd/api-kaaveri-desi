@@ -12,14 +12,13 @@ const getReviewModel = async () => {
 router.post('/reviews/:productId', async (req, res) => {
     try {
         const Review = await getReviewModel();
-        const { productId } = req.params;  // Get productId from URL
-        const { userName, userEmail, rating, comment } = req.body;
+        const { name, userEmail, rating, comment } = req.body;
         
         // Validation
-        if (!userName || !userEmail || !rating || !comment) {
+        if (!name || !userEmail || !rating || !comment) {
             return res.status(400).json({
                 success: false,
-                message: 'All fields are required (userName, userEmail, rating, comment)'
+                message: 'All fields are required (name, userEmail, rating, comment)'
             });
         }
         
@@ -43,7 +42,7 @@ router.post('/reviews/:productId', async (req, res) => {
         // Create new review
         const newReview = await Review.create({
             productId,
-            userName,
+            name,
             userEmail,
             rating,
             comment
